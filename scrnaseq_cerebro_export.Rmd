@@ -30,12 +30,19 @@ param$gmt_file = "gmt_files/c2.all.v7.1.symbols.gmt"
 We load the transcript count matrix (.h5 format), create a Seurat object and remove cells with less than 100 transcripts or fewer than 50 expressed genes. Then, we follow the standard Seurat workflow.
 Furthermore, we build a cluster tree that represents the similarity between clusters and create a dedicated cluster column in the meta data.
 ```{r pre-processing, message=FALSE, warning=FALSE}
-feature_matrix <- Read10X_h5(param$path_matrix)
-seurat <- CreateSeuratObject(
-  project = param$project,
-  counts = feature_matrix,
-  min.cells = 10
-)
+# feature_matrix <- Read10X_h5(param$path_matrix)
+# seurat <- CreateSeuratObject(
+#   project = param$project,
+#   counts = feature_matrix,
+#   min.cells = 10
+# )
+
+# Load the PBMC dataset
+seurat.data <- Read10X(data.dir = "projects/N1729/filtered_feature_bc_matrix/")
+# Initialize the Seurat object with the raw (non-normalized data).
+seurat <- CreateSeuratObject(counts = seurat.data, project = "N1729", min.cells = 3, min.features = 200)
+seurat
+
 seurat <- subset(seurat, subset = nCount_RNA > 100 & nFeature_RNA > 50)
 seurat <- NormalizeData(seurat)
 seurat <- FindVariableFeatures(seurat)
