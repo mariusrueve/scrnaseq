@@ -9,8 +9,21 @@
 
 library(shiny)
 library(Seurat)
+library(ggplot2)
+library(readxl)
 
-seurat_genes = sc.markers[["gene"]]
+read_excel_allsheets <- function(filename, tibble = TRUE) {
+    # I prefer straight data.frames
+    # but if you like tidyverse tibbles (the default with read_excel)
+    # then just pass tibble = TRUE
+    sheets <- readxl::excel_sheets(filename)
+    x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    if(!tibble) x <- lapply(x, as.data.frame)
+    names(x) <- sheets
+    x
+}
+sc_markers = read_excel("/lager2/rcug_cd/scrnaseq/projects/pbmc/results/markers.xlsx")
+seurat_genes = sc_markers[["gene"]]
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -18,6 +31,7 @@ ui <- fluidPage(
 
         sidebarPanel(
             selectInput("genes", "Gene:", seurat_genes, multiple = TRUE),
+            downloadButton('foo')
         ),
         
         mainPanel(
@@ -29,7 +43,12 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-
+    
+    reactive({
+        sc_markers = read_excel_allsheets("/lager2/rcug_cd/scrnaseq/projects/pbmc/results/markers.xlsx")
+        seurat_genes = sc_markers[["gene"]]
+    })
+    
     output$out_umap = renderUI({
         out = list()
         
@@ -49,7 +68,9 @@ server <- function(input, output) {
             })
         }                                  
     })
-    
+
+        
+    #Ridge Plot
     output$out_ridge = renderUI({
         out = list()
         
@@ -69,6 +90,16 @@ server <- function(input, output) {
             })
         }                                  
     })
+    
+    output$foo = downloadHandler(
+        filename = 'test.png',
+        content = function(file) {
+            device <- function(..., width, height) {
+                grDevices::png(..., width = width, height = height,
+                               res = 300, units = "in")
+            }
+            ggsave(file, plot = output$out_ridge , device = device)
+        })
 }
 
 # Run the application 
