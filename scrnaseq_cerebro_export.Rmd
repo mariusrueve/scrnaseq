@@ -20,8 +20,8 @@ param = list()
 
 param$project = "N1729"
 param$organism = "mm" # Organism: hg or mm
-param$path_project= "projects/N1729/"
-param$path_matrix = "projects/N1729/filtered_feature_bc_matrix.h5"
+param$path_project= "projects/N1730/"
+param$path_matrix = "projects/N1730/filtered_feature_bc_matrix.h5"
 param$gmt_file = "gmt_files/c2.all.v7.1.symbols.gmt"
 
 ```
@@ -38,7 +38,7 @@ Furthermore, we build a cluster tree that represents the similarity between clus
 # )
 
 # Load the PBMC dataset
-seurat.data <- Read10X(data.dir = "projects/N1729/filtered_feature_bc_matrix/")
+seurat.data <- Read10X(data.dir = "projects/N1730/filtered_feature_bc_matrix/")
 # Initialize the Seurat object with the raw (non-normalized data).
 seurat <- CreateSeuratObject(counts = seurat.data, project = "N1729", min.cells = 3, min.features = 200)
 seurat
