@@ -8,7 +8,7 @@ output: html_document
 https://github.com/romanhaa/Cerebro/tree/master/examples/pbmc_10k_v3/Seurat_v3
 
 # Setup
-```{r setup, message=FALSE}
+```{r setup}
 # libraries
 library('dplyr')
 library('Seurat')
@@ -18,10 +18,10 @@ library('cerebroApp')
 # project specific
 param = list()
 
-param$project = "N1729"
-param$organism = "mm" # Organism: hg or mm
-param$path_project= "projects/N1730/"
-param$path_matrix = "projects/N1730/filtered_feature_bc_matrix.h5"
+param$project = "pbmc_10k_v3"
+param$organism = "hg" # Organism: hg or mm
+param$path_project= "projects/pbmc_10k_v3/"
+param$path_matrix = "projects/pbmc_10k_v3/pbmc_10k_v3_filtered_feature_bc_matrix.h5"
 param$gmt_file = "gmt_files/c2.all.v7.1.symbols.gmt"
 
 ```
@@ -29,19 +29,14 @@ param$gmt_file = "gmt_files/c2.all.v7.1.symbols.gmt"
 # Pre-processing with Seurat
 We load the transcript count matrix (.h5 format), create a Seurat object and remove cells with less than 100 transcripts or fewer than 50 expressed genes. Then, we follow the standard Seurat workflow.
 Furthermore, we build a cluster tree that represents the similarity between clusters and create a dedicated cluster column in the meta data.
-```{r pre-processing, message=FALSE, warning=FALSE}
-# feature_matrix <- Read10X_h5(param$path_matrix)
-# seurat <- CreateSeuratObject(
-#   project = param$project,
-#   counts = feature_matrix,
-#   min.cells = 10
-# )
+```{r pre-processing}
+feature_matrix <- Read10X_h5(param$path_matrix)
+seurat <- CreateSeuratObject(
+  project = param$project,
+  counts = feature_matrix,
+  min.cells = 10
+)
 
-# Load the PBMC dataset
-seurat.data <- Read10X(data.dir = "projects/N1730/filtered_feature_bc_matrix/")
-# Initialize the Seurat object with the raw (non-normalized data).
-seurat <- CreateSeuratObject(counts = seurat.data, project = "N1729", min.cells = 3, min.features = 200)
-seurat
 
 seurat <- subset(seurat, subset = nCount_RNA > 100 & nFeature_RNA > 50)
 seurat <- NormalizeData(seurat)
@@ -68,7 +63,7 @@ seurat@meta.data$tree.ident <- NULL
 # Cell cycle analysis
 We also perform cell cycle analysis using the CellCycleScoring built into Seurat.The S and G2M phase-specific gene lists are stored in the Seurat object so we have access to these lists in Cerebro.
 
-```{r cellcycleanalysis, message=FALSE, warning=FALSE}
+```{r cellcycleanalysis}
 seurat <- CellCycleScoring(
   seurat,
   g2m.features = cc.genes$g2m.genes,
@@ -81,7 +76,7 @@ seurat@misc$gene_lists$S_phase_genes <- cc.genes$s.genes
 
 # Dimensional reduction
 Next, we generate 4 dimensional reduction: tSNE, tSNE(3D), UMAP, UMAP(3D)
-```{r dimensionalreduction, message=FALSE, warning=FALSE}
+```{r dimensionalreduction}
 seurat <- RunTSNE(
   seurat,
   reduction.name = 'tSNE',
@@ -123,7 +118,7 @@ seurat <- RunUMAP(
 
 # Meta data
 This example data set consists of a single sample so we just add that name to the meta data. Moreover, in order to be able to understand how we did the analysis later , we add some meta data to the misc slot of the Seurat object.
-```{r metadata, message=FALSE, warning=FALSE}
+```{r metadata}
 seurat@meta.data$sample <- factor(param$project, levels = param$project)
 
 seurat@misc$experiment <- list(
@@ -160,7 +155,7 @@ Using the functions provided by cerebroApp, we check the percentage of mitochond
 * identify marker genes (with the FindAllMarkers of Seurat),
 * get enriched pathways in marker lists (using Enrichr)
 * and perform gene set enrichment analysis (using GSVA).
-```{r cerebroAppfunctions, eval=TRUE}
+```{r cerebroAppfunctions}
 seurat <- cerebroApp::addPercentMtRibo(
   seurat,
   organism = param$organism,
@@ -203,7 +198,7 @@ seurat <- cerebroApp::performGeneSetEnrichmentAnalysis(
 # Trajectory analysis with Monocle
 ## All cells
 Next, we perform trajectory analysis of all cells with Monocle using the previously identified highly variable genes. We extract the trajectory from the generated Monocle object with the extractMonocleTrajectory() function of cerebroApp and attach it to our Seurat object.
-```{r trajectoryallcells, message=FALSE, warning=FALSE}
+```{r trajectoryallcells}
 monocle_all_cells <- newCellDataSet(
   seurat@assays$RNA@data,
   phenoData = new('AnnotatedDataFrame', data = seurat@meta.data),
@@ -224,7 +219,7 @@ seurat <- cerebroApp::extractMonocleTrajectory(monocle_all_cells, seurat, 'all_c
 
 ## Cells in G1 phase
 Then, we do the same procedure again, however this time only with a subset of cells (those which are in G1 phase of the cell cycle).
-```{r trajectory_g1_phase, message=FALSE, warning=FALSE}
+```{r trajectory_g1_phase}
 G1_cells <- which(seurat@meta.data$Phase == 'G1')
 
 monocle_subset_of_cells <- newCellDataSet(
@@ -247,7 +242,7 @@ seurat <- cerebroApp::extractMonocleTrajectory(monocle_subset_of_cells, seurat, 
 
 # Export to Cerebro format
 Finally, we use the exportFromSeurat() function of cerebroApp to export our Seurat object to a .crb file which can be loaded into Cerebro.
-```{r export_to_cerebro, message=FALSE, warning=FALSE}
+```{r export_to_cerebro}
 cerebroApp::exportFromSeurat(
   seurat,
   experiment_name = param$project,
@@ -262,7 +257,7 @@ cerebroApp::exportFromSeurat(
 
 # Save Seurat object
 Very last step: Save the Seurat object.
-```{r save_seurat_object, message=FALSE, warning=FALSE}
+```{r save_seurat_object}
 #saveRDS(seurat, paste0(param$path_project,'seurat_export/', param$project, '_', Sys.Date(), '.rds'))
 # Problem with too long paths
 saveRDS(seurat, paste0(param$project, '_', Sys.Date(), '.rds'))
