@@ -1,0 +1,99 @@
+---
+title: "Untitled"
+author: "author"
+date: "date"
+output: 
+  flexdashboard::flex_dashboard:
+      orientation: columns
+vertical_layout: scroll
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(Seurat)
+library(ggplot2)
+library (miniUI)
+options(shiny.maxRequestSize = 30*1024^2) # 30mb limit
+
+param = list()
+param$col = "palevioletred"
+```
+
+```{r}
+sc = readRDS("pbmc_10k_v3_2020-05-29.rds")
+selection = sc@misc[["gene_lists"]][["G2M_phase_genes"]]
+```
+
+```{r}
+PlotMystyle = function(p, title=NULL, col=NULL, legend_title=NULL, legend_position=NULL) {
+  p = p + theme_light() + theme(panel.border = element_blank())
+  if (!is.null(title)) p = p + ggtitle(title) #+ theme(plot.title = element_text(hjust=0.5))
+  if (length(col) > 0) p = p + scale_fill_manual(values=col)
+  if (!is.null(legend_title)) {
+    p = p + labs(color=legend_title, fill=legend_title)
+  } else {
+    p = p + theme(legend.title = element_blank()) 
+  }
+  if (!is.null(legend_position)) p = p + theme(legend.position=legend_position)
+  return(p)
+}
+```
+
+Inputs {.sidebar data-width=500}
+=====================================
+
+```{r}
+# 
+fileInput("rds_file","Choose Seurat file:", accept = ".rds", buttonLabel = "Browse...")
+
+fileInput("xlsx_file","Choose Excel file for markers:", accept = ".xlsx", buttonLabel = "Browse...")
+
+selectInput("plots", "Plots:", c("FeaturePlot", "RidgePlot"), multiple = TRUE)
+
+selectInput("genes", "Gene:", selection, multiple = TRUE)
+
+downloadButton('download_plots')
+```
+
+FeaturePlot
+=====================================  
+
+### FeaturePlot
+    
+```{r}
+  
+uiOutput("ui_feature")
+output$ui_feature = renderUI({
+
+  out_feature = list()
+  if (length(input$genes)==0){return(NULL)}
+  for (i in 1:length(input$genes)){
+    out_feature[[i]] <-  plotOutput(outputId = paste0("plot_feature",i))
+    }
+  return(out_feature)
+  })
+
+observe({
+  for (i in 1:length(input$genes)){
+    local({  #because expressions are evaluated at app init
+      ii <- i
+      output[[paste0('plot_feature',ii)]] <- renderPlot({
+        return(Seurat::FeaturePlot(sc,
+                                   features=input$genes[[ii]],
+                                   cols=c("lightgrey",
+                                          param$col),
+                                   combine=FALSE))
+        })
+      })
+    }
+  })
+```
+
+Page 2
+=====================================     
+
+### Chart 2
+    
+```{r}
+```
