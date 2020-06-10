@@ -10,8 +10,9 @@
 library(shiny)
 library(Seurat)
 library(ggplot2)
-library(patchwork)
 library(readxl)
+
+source("MyFeaturePlot.R")
 
 param = list()
 param$col = "palevioletred"
@@ -28,22 +29,12 @@ param$col = "palevioletred"
 # }
 #sc_markers = read_excel_allsheets("/lager2/rcug_cd/scrnaseq/projects/pbmc/results/markers.xlsx")
 
-#sc = readRDS(file = "pbmc_2020-05-27.rds")
-seurat_genes = sc@misc[["gene_lists"]]
+sc = readRDS(file = "pbmc_2020-06-08.rds")
+#seurat_genes = rownames(sc[[DefaultAssay(sc)]])
+#gene_ensembl_combi = paste(seurat_genes," (",sc[["RNA"]][[]][,1],")", sep="")
 
+features_names_ids = paste(rownames(sc[["RNA"]][[]]), " (", sc[["RNA"]][[]][,1], ")", sep = "")
 
-PlotMystyle = function(p, title=NULL, col=NULL, legend_title=NULL, legend_position=NULL) {
-    p = p + theme_light() + theme(panel.border = element_blank())
-    if (!is.null(title)) p = p + ggtitle(title) #+ theme(plot.title = element_text(hjust=0.5))
-    if (length(col) > 0) p = p + scale_fill_manual(values=col)
-    if (!is.null(legend_title)) {
-        p = p + labs(color=legend_title, fill=legend_title)
-    } else {
-        p = p + theme(legend.title = element_blank()) 
-    }
-    if (!is.null(legend_position)) p = p + theme(legend.position=legend_position)
-    return(p)
-}
 
 # Define UI for application that draws a histogram
 ui = fluidPage(
@@ -51,60 +42,78 @@ ui = fluidPage(
 
         sidebarPanel(
             fileInput("rds_file","Choose Seurat file:", accept = ".rds", buttonLabel = "Browse..."),
-            selectInput("plots", "Plots:", c("FeaturePlot", "RidgePlot"), multiple = TRUE),
-            selectInput("genes", "Gene:", seurat_genes, multiple = TRUE),
+            selectInput("genes", "Gene:", features_names_ids, multiple = TRUE),
             downloadButton('download_plots')
         ),
         
         mainPanel(
             #splitLayout(cellWidths = c("50%","50%"),uiOutput('out_feature'), uiOutput('out_ridge'))
             tabsetPanel(type = "tabs",
-                        # tabPanel("Feature", uiOutput('ui_feature')),
-                        tabPanel("Feature", plotOutput('plot_feature')),
-                        tabPanel("Ridge", uiOutput('ui_ridge'))
+                        tabPanel("Feature", uiOutput('ui_feature')),
+                        #tabPanel("Feature", plotOutput('plot_feature_test')),
+                        tabPanel("Ridge", uiOutput('ui_ridge')),
+                        tabPanel("DotPlot", plotOutput('plot_dotplot'))
             )
         )
 )
 
 # Define server logic required to draw a histogram
 server = function(input, output) {
-    
-    # # gen plot containers
-    # output$ui_feature = renderUI({
-    #     out_feature = list()
-    # 
-    #     if (length(input$genes)==0){return(NULL)}
-    #     for (i in 1:length(input$genes)){
-    #         out_feature[[i]] =  plotOutput(outputId = paste0("plot_feature",i))
-    #     }
-    #     return(out_feature)
-    # })
-    # # render plots
-    # observe({
-    #     for (i in 1:length(input$genes)){
-    #         local({  #because expressions are evaluated at app init
-    #             ii = i
-    #             output[[paste0('plot_feature',ii)]] = renderPlot({
-    #                 return(Seurat::FeaturePlot(sc, features=input$genes[[ii]], cols=c("lightgrey", param$col), combine=FALSE))
-    #             })
-    #         })
-    #     }
-    # })
+  
+  # observe({
+  #   sc = readRDS(file = input$rds_file)
+  #   seurat_genes = rownames(sc[[DefaultAssay(sc)]])
+  #   updateSelectInput(
+  #     session,
+  #     "genes",
+  #     choices=names(seurat_genes)
+  #   )
+  # })
 
-    out$plot_feature = renderPlot({
-      p = Seurat::FeaturePlot(sc, features=input$genes, cols=c("lightgrey", param$col), combine=FALSE)
-      names(p) = input$genes
-      for (i in features) p[[i]] = PlotMystyle(p[[i]], title=i)
-      patchwork::wrap_plots(p, ncol=2)
+    ########################################
+    # gen plot containers
+    output$ui_feature = renderUI({
+        out_feature = list()
+
+        if (length(input$genes)==0){return(NULL)}
+        for (i in 1:length(input$genes)){
+            out_feature[[i]] =  plotOutput(outputId = paste0("plot_feature",i),
+                                           width = "100%",
+                                           height = "600px")
+        }
+        return(out_feature)
+    })
+    # render plots
+    observe({
+        for (i in 1:length(input$genes)){
+            local({  #because expressions are evaluated at app init
+                ii = i
+                output[[paste0('plot_feature',ii)]] = renderPlot({
+                  return(Seurat::FeaturePlot(sc, features=unlist(strsplit(input$genes[[ii]]," \\("))[c(T,F)], cols=c("lightgrey", param$col), combine=FALSE))
+                })
+            })
+        }
     })
 
+    ########################################
+    # Test
+    output$plot_feature_test = renderPlot({
+      p = Seurat::FeaturePlot(sc, features=input$genes, cols=c("lightgrey", param$col), combine=FALSE)
+      names(p) = input$genes
+      for (i in input$genes) p[[i]] = PlotMystyle(p[[i]], title=i)
+      patchwork::wrap_plots(p, ncol=1)
+    })
+
+    ########################################
     #Ridge Plot
     output$ui_ridge = renderUI({
         out_ridge = list()
         
         if (length(input$genes)==0){return(NULL)}
         for (i in 1:length(input$genes)){
-            out_ridge[[i]] =  plotOutput(outputId = paste0("plot_ridge",i))
+            out_ridge[[i]] =  plotOutput(outputId = paste0("plot_ridge",i),
+                                         width = "100%",
+                                         height = "600px")
         }  
         return(out_ridge) 
     })
@@ -113,10 +122,15 @@ server = function(input, output) {
             local({  #because expressions are evaluated at app init
                 ii = i 
                 output[[paste0('plot_ridge',ii)]] = renderPlot({ 
-                    return(Seurat::RidgePlot(sc, features=input$genes[[ii]], combine=FALSE))
+                    return(Seurat::RidgePlot(sc, features=unlist(strsplit(input$genes[[ii]]," \\("))[c(T,F)], combine=FALSE))
                 })
             })
         }                                  
+    })
+    
+    ########################################
+    output$plot_dotplot = renderPlot({
+      Seurat::DotPlot(sc, features=unlist(strsplit(input$genes," \\("))[c(T,F)], cols=c("lightgrey", param$col))
     })
     
     output$downloadPlot = downloadHandler(
